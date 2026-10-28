@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.db
+.env
+.DS_Store
+Thumbs.db
+google_sheets_config.json
+.env
+__pycache__/
+*.pyc
