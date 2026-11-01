@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Academic & Activity Ledger</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary-navy: #17365D;
+            --accent-blue: #235284;
+            --border-color: #E2E8F0;
+        }
+        body {
+            background-color: #F8FAFC;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #1E293B;
+        }
+        .header-bar {
+            background-color: var(--primary-navy);
+            color: white;
+            padding: 14px 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .sidebar {
+            background: white;
+            border-right: 1px solid var(--border-color);
+            height: calc(100vh - 65px);
+            overflow-y: auto;
+        }
+        .main-content {
+            height: calc(100vh - 65px);
+            overflow-y: auto;
+            padding: 24px 32px;
+        }
+        .student-item {
+            cursor: pointer;
+            padding: 12px 16px;
+            border-bottom: 1px solid #F1F5F9;
+            transition: all 0.15s ease-in-out;
+        }
+        .student-item:hover {
+            background-color: #F1F5F9;
+        }
+        .student-item.active {
+            background-color: #E0E7FF;
+            border-left: 4px solid var(--primary-navy);
+            font-weight: 600;
+        }
+        .eligibility-banner {
+            padding: 16px 20px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .banner-eligible {
+            background-color: #ECFDF5;
+            border: 1px solid #A7F3D0;
+            color: #065F46;
+        }
+        .banner-ineligible {
+            background-color: #FEF2F2;
+            border: 1px solid #FECACA;
+            color: #991B1B;
+        }
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .nav-tabs .nav-link {
+            color: #64748B;
+            font-weight: 500;
+            border: none;
+            padding: 10px 18px;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--primary-navy);
+            border-bottom: 3px solid var(--primary-navy);
+            background: transparent;
+            font-weight: 600;
+        }
+        .badge-roll {
+            font-family: monospace;
+            font-size: 0.85rem;
+            background: #EDE9FE;
+            color: #5B21B6;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation Bar -->
+    <header class="header-bar d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center gap-3">
+            <h4 class="mb-0 fw-bold"><i class="bi bi-mortarboard-fill me-2"></i>Student Academic & Activity Ledger</h4>
+            <span class="badge bg-light text-dark text-uppercase px-2 py-1" id="dbModeBadge">Database: Checking...</span>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/export/csv_zip" class="btn btn-sm btn-outline-light">
+                <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export 6 CSVs (Zip)
+            </a>
+            <button class="btn btn-sm btn-light text-primary fw-semibold" data-bs-toggle="modal" data-bs-target="#sheetsModal">
+                <i class="bi bi-google me-1"></i>Google Sheets Sync
+            </button>
+        </div>
+    </header>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Left Sidebar: Students Directory -->
+            <div class="col-md-4 col-lg-3 sidebar p-0">
+                <div class="p-3 border-bottom bg-light">
+                    <div class="input-group input-group-sm mb-2">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by name or roll...">
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted fw-bold" id="studentsCount">0 Students</small>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addStudentModal">
+                                <i class="bi bi-person-plus-fill me-1"></i>Add
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnSeedDemo" title="Seed Fictional Demo Records">
+                                <i class="bi bi-magic"></i> Demo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="studentListContainer">
+                    <div class="text-center p-4 text-muted">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div> Loading student directory...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Area: Selected Student Ledger -->
+            <div class="col-md-8 col-lg-9 main-content">
+                <div id="emptyPrompt" class="text-center py-5 d-none">
+                    <i class="bi bi-person-badge fs-1 text-muted"></i>
+                    <h5 class="mt-3 text-muted">No student selected</h5>
+                    <p class="text-muted">Select a student from the directory on the left or add a new record.</p>
+                </div>
+
+                <div id="studentDetails">
+                    <!-- Top Student Banner -->
+                    <div class="card p-3 mb-3 bg-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 class="fw-bold mb-1" id="detailFullName">--</h3>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge badge-roll px-2 py-1" id="detailRoll">--</span>
+                                    <span class="text-muted"><i class="bi bi-envelope me-1"></i><span id="detailEmail">--</span></span>
+                                    <span class="text-muted">|</span>
+                                    <span class="text-muted"><i class="bi bi-calendar3 me-1"></i>DOB: <span id="detailDOB">--</span></span>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-secondary" id="detailStatus">Active</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Eligibility Banner -->
+                    <div class="eligibility-banner" id="eligibilityBanner">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi fs-2" id="eligibilityIcon"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold" id="eligibilityTitle">Eligibility Status</h6>
+                                <small id="eligibilityMessage">Checking criteria...</small>
+                            </div>
+                        </div>
+                        <span class="badge px-3 py-2 fs-6" id="eligibilityBadge">CHECKING</span>
+                    </div>
+
+                    <!-- Tabbed Sections -->
+                    <ul class="nav nav-tabs mb-3" id="ledgerTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabProfile">
+                                <i class="bi bi-person-lines-fill me-1"></i>Profile
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabGraph">
+                                <i class="bi bi-graph-up me-1"></i>Progression Graph
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabMarks">
+                                <i class="bi bi-journal-check me-1"></i>Subject Marks (<span id="countMarks">0</span>)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSeminars">
+                                <i class="bi bi-mic me-1"></i>Seminars (<span id="countSeminars">0</span>)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabActivities">
+                                <i class="bi bi-trophy me-1"></i>Activities (<span id="countActivities">0</span>)
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDropYears">
+                                <i class="bi bi-hourglass-split me-1"></i>Gap Years (<span id="countDrop">0</span>)
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="ledgerTabContent">
+                        <!-- Profile Tab -->
+                        <div class="tab-pane fade show active" id="tabProfile">
+                            <div class="card p-4">
+                                <h6 class="fw-bold mb-3 border-bottom pb-2">Academic Profile & Eligibility Checklist</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">Year of Study</label>
+                                        <p class="fs-6 fw-semibold" id="profYearOfStudy">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">Student Type</label>
+                                        <p class="fs-6 fw-semibold" id="profStudentType">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">Attendance Roll Status</label>
+                                        <p class="fs-6 fw-semibold" id="profAttendanceRoll">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">Admission Year</label>
+                                        <p class="fs-6 fw-semibold" id="profAdmissionYear">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">10th Percentage</label>
+                                        <p class="fs-6 fw-semibold" id="profTenth">--</p>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label text-muted small fw-bold">12th / Diploma Percentage</label>
+                                        <p class="fs-6 fw-semibold" id="profTwelfth">--</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Progression Graph Tab -->
+                        <div class="tab-pane fade" id="tabGraph">
+                            <div class="card p-4">
+                                <h6 class="fw-bold mb-3">Academic Performance Progression (SGPA & CGPA Across Semesters)</h6>
+                                <div style="height: 320px;">
+                                    <canvas id="progressionChart"></canvas>
+                                </div>
+                                <div class="mt-4">
+                                    <h6 class="fw-bold mb-2 small text-muted">Semester Results Summary</h6>
+                                    <table class="table table-sm table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Semester</th>
+                                                <th>SGPA</th>
+                                                <th>CGPA</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="semestersTableBody">
+                                            <tr><td colspan="3" class="text-center text-muted">No semesters recorded</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Subject Marks Tab -->
+                        <div class="tab-pane fade" id="tabMarks">
+                            <div class="card p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Sem</th>
+                                                <th>Subject Name</th>
+                                                <th>Type</th>
+                                                <th>Internal</th>
+                                                <th>External</th>
+                                                <th>Lab</th>
+                                                <th>Total</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="marksTableBody">
+                                            <tr><td colspan="8" class="text-center text-muted">No subject marks recorded</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seminars Tab -->
+                        <div class="tab-pane fade" id="tabSeminars">
+                            <div class="card p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Seminar Title</th>
+                                                <th>Type</th>
+                                                <th>Date</th>
+                                                <th>Certificate Reference</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="seminarsTableBody">
+                                            <tr><td colspan="4" class="text-center text-muted">No seminars recorded</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Activities Tab -->
+                        <div class="tab-pane fade" id="tabActivities">
+                            <div class="card p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Activity Name</th>
+                                                <th>Category</th>
+                                                <th>Date</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="activitiesTableBody">
+                                            <tr><td colspan="4" class="text-center text-muted">No activities recorded</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gap Years Tab -->
+                        <div class="tab-pane fade" id="tabDropYears">
+                            <div class="card p-3">
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Start Year</th>
+                                                <th>End Year</th>
+                                                <th>Reason</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="dropTableBody">
+                                            <tr><td colspan="3" class="text-center text-muted">No gap or drop years recorded</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div class="modal fade" id="addStudentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">Add Student Record</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formAddStudent">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Roll Number *</label>
+                            <input type="text" class="form-control" name="roll_number" required placeholder="e.g. TE-01">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Full Name *</label>
+                            <input type="text" class="form-control" name="full_name" required placeholder="e.g. Aarav Sharma">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Year of Study</label>
+                                <select class="form-select" name="year_of_study">
+                                    <option value="TE" selected>TE (Third Year)</option>
+                                    <option value="SE">SE (Second Year)</option>
+                                    <option value="BE">BE (Final Year)</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Student Type</label>
+                                <select class="form-select" name="student_type">
+                                    <option value="Regular" selected>Regular</option>
+                                    <option value="Direct Second Year">Direct Second Year (DSE)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Date of Birth</label>
+                                <input type="date" class="form-control" name="date_of_birth">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">Admission Year</label>
+                                <input type="number" class="form-control" name="admission_year" value="2022">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Email</label>
+                            <input type="email" class="form-control" name="email" placeholder="student@example.edu">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">10th %</label>
+                                <input type="number" step="0.01" class="form-control" name="tenth_percentage">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-bold">12th %</label>
+                                <input type="number" step="0.01" class="form-control" name="twelfth_percentage">
+                            </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_on_attendance_roll" value="1" checked id="chkOnRoll">
+                            <label class="form-check-label small" for="chkOnRoll">Present on Current Attendance Roll</label>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Save Student</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Sheets Synchronization Modal -->
+    <div class="modal fade" id="sheetsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-navy text-white" style="background-color: var(--primary-navy);">
+                    <h5 class="modal-title fw-bold text-white"><i class="bi bi-google me-2"></i>Google Sheets One-Way Sync</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="card p-3 mb-3 bg-light">
+                        <h6 class="fw-bold mb-2">Live Sync Configuration</h6>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted mb-0">Spreadsheet ID:</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="sheetsSid" class="form-control font-monospace" readonly>
+                                <a id="btnOpenSheet" href="#" target="_blank" class="btn btn-outline-secondary">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i>Open Sheet
+                                </a>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted mb-0">Service Account Email:</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="sheetsEmail" class="form-control font-monospace" readonly>
+                                <button class="btn btn-outline-secondary" type="button" id="btnCopyEmail">
+                                    <i class="bi bi-clipboard"></i> Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <button class="btn btn-outline-primary" id="btnTestSheets">
+                            <i class="bi bi-shield-check me-1"></i>Test Connection
+                        </button>
+                        <button class="btn btn-success" id="btnPushSheets">
+                            <i class="bi bi-cloud-arrow-up-fill me-1"></i>Push Changes to Google Sheets
+                        </button>
+                    </div>
+
+                    <div id="sheetsLogContainer" class="d-none">
+                        <label class="form-label small fw-bold text-muted">Status Response / Actionable Instructions:</label>
+                        <pre id="sheetsLog" class="p-3 bg-dark text-white rounded font-monospace small" style="white-space: pre-wrap; max-height: 250px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let currentStudentId = null;
+        let chartInstance = null;
+
+        // Fetch Initial System Status & Student Directory
+        document.addEventListener("DOMContentLoaded", () => {
+            loadStatus();
+            loadStudents();
+            loadSheetsConfig();
+
+            document.getElementById("searchInput").addEventListener("input", (e) => {
+                loadStudents(e.target.value);
+            });
+
+            document.getElementById("btnSeedDemo").addEventListener("click", seedDemo);
+            document.getElementById("btnTestSheets").addEventListener("click", testSheetsConnection);
+            document.getElementById("btnPushSheets").addEventListener("click", pushSheetsSync);
+            document.getElementById("btnCopyEmail").addEventListener("click", copyServiceAccountEmail);
+
+            document.getElementById("formAddStudent").addEventListener("submit", (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
+                data.is_on_attendance_roll = formData.has("is_on_attendance_roll") ? 1 : 0;
+
+                fetch("/api/student", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data)
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        bootstrap.Modal.getInstance(document.getElementById("addStudentModal")).hide();
+                        e.target.reset();
+                        loadStudents();
+                    } else {
+                        alert("Error: " + res.message);
+                    }
+                });
+            });
+        });
+
+        function loadStatus() {
+            fetch("/api/status")
+                .then(r => r.json())
+                .then(data => {
+                    const badge = document.getElementById("dbModeBadge");
+                    if (data.db_mode === "mysql") {
+                        badge.className = "badge bg-success text-white px-2 py-1";
+                        badge.textContent = "MySQL: student_academic_ledger";
+                    } else {
+                        badge.className = "badge bg-info text-dark px-2 py-1";
+                        badge.textContent = "SQLite Demo / Cloud Mode";
+                    }
+                });
+        }
+
+        function loadStudents(search = "") {
+            fetch(`/api/students?q=${encodeURIComponent(search)}`)
+                .then(r => r.json())
+                .then(students => {
+                    const container = document.getElementById("studentListContainer");
+                    document.getElementById("studentsCount").textContent = `${students.length} Students`;
+                    if (students.length === 0) {
+                        container.innerHTML = '<div class="text-center p-4 text-muted">No students found</div>';
+                        return;
+                    }
+
+                    container.innerHTML = students.map(s => `
+                        <div class="student-item ${currentStudentId === s.student_id ? 'active' : ''}" onclick="selectStudent(${s.student_id})">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="badge badge-roll">${s.roll_number}</span>
+                                <small class="badge bg-light text-secondary">${s.year_of_study || 'TE'}</small>
+                            </div>
+                            <div class="fw-semibold text-truncate mt-1">${s.full_name}</div>
+                        </div>
+                    `).join("");
+
+                    if (!currentStudentId && students.length > 0) {
+                        selectStudent(students[0].student_id);
+                    }
+                });
+        }
+
+        function selectStudent(studentId) {
+            currentStudentId = studentId;
+            document.querySelectorAll(".student-item").forEach(el => el.classList.remove("active"));
+            loadStudents(document.getElementById("searchInput").value);
+
+            fetch(`/api/student/${studentId}`)
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById("emptyPrompt").classList.add("d-none");
+                    document.getElementById("studentDetails").classList.remove("d-none");
+
+                    const s = data.student;
+                    const elig = data.eligibility;
+
+                    // Detail Banner
+                    document.getElementById("detailFullName").textContent = s.full_name;
+                    document.getElementById("detailRoll").textContent = s.roll_number;
+                    document.getElementById("detailEmail").textContent = s.email || "Not recorded";
+                    document.getElementById("detailDOB").textContent = s.date_of_birth || "Not recorded";
+                    document.getElementById("detailStatus").textContent = s.current_status || "Active";
+
+                    // Eligibility Banner
+                    const elBanner = document.getElementById("eligibilityBanner");
+                    const elBadge = document.getElementById("eligibilityBadge");
+                    const elIcon = document.getElementById("eligibilityIcon");
+                    const elTitle = document.getElementById("eligibilityTitle");
+                    const elMsg = document.getElementById("eligibilityMessage");
+
+                    if (elig.is_eligible) {
+                        elBanner.className = "eligibility-banner banner-eligible";
+                        elBadge.className = "badge bg-success px-3 py-2 fs-6";
+                        elBadge.textContent = "ELIGIBLE";
+                        elIcon.className = "bi bi-check-circle-fill text-success fs-2";
+                        elTitle.textContent = "TE Regular Eligibility Confirmed";
+                        elMsg.textContent = elig.message;
+                    } else {
+                        elBanner.className = "eligibility-banner banner-ineligible";
+                        elBadge.className = "badge bg-danger px-3 py-2 fs-6";
+                        elBadge.textContent = "INELIGIBLE";
+                        elIcon.className = "bi bi-exclamation-triangle-fill text-danger fs-2";
+                        elTitle.textContent = "Not Eligible for TE Regular Ledger";
+                        elMsg.textContent = elig.message;
+                    }
+
+                    // Profile Tab
+                    document.getElementById("profYearOfStudy").textContent = s.year_of_study || "TE";
+                    document.getElementById("profStudentType").textContent = s.student_type || "Regular";
+                    document.getElementById("profAttendanceRoll").textContent = (s.is_on_attendance_roll == 1) ? "On Current Attendance Roll" : "Not On Roll";
+                    document.getElementById("profAdmissionYear").textContent = s.admission_year || "--";
+                    document.getElementById("profTenth").textContent = s.tenth_percentage ? s.tenth_percentage + "%" : "--";
+                    document.getElementById("profTwelfth").textContent = s.twelfth_percentage ? s.twelfth_percentage + "%" : "--";
+
+                    // Marks Tab
+                    document.getElementById("countMarks").textContent = data.marks.length;
+                    const marksBody = document.getElementById("marksTableBody");
+                    if (data.marks.length === 0) {
+                        marksBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No subject marks recorded</td></tr>';
+                    } else {
+                        marksBody.innerHTML = data.marks.map(m => `
+                            <tr>
+                                <td><span class="badge bg-secondary">Sem ${m.semester_number}</span></td>
+                                <td class="fw-semibold">${m.subject_name}</td>
+                                <td>${m.subject_type || 'Theory'}</td>
+                                <td>${m.internal_marks ?? '-'}</td>
+                                <td>${m.external_marks ?? '-'}</td>
+                                <td>${m.lab_marks ?? '-'}</td>
+                                <td class="fw-bold">${m.total_marks ?? '-'}</td>
+                                <td><span class="badge ${m.result_status === 'Pass' ? 'bg-success' : 'bg-primary'}">${m.result_status || 'Pass'}</span></td>
+                            </tr>
+                        `).join("");
+                    }
+
+                    // Seminars Tab
+                    document.getElementById("countSeminars").textContent = data.seminars.length;
+                    const semBody = document.getElementById("seminarsTableBody");
+                    if (data.seminars.length === 0) {
+                        semBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No seminars recorded</td></tr>';
+                    } else {
+                        semBody.innerHTML = data.seminars.map(sm => `
+                            <tr>
+                                <td class="fw-semibold">${sm.seminar_name}</td>
+                                <td><span class="badge bg-info text-dark">${sm.seminar_type || 'Internal'}</span></td>
+                                <td>${sm.event_date || '--'}</td>
+                                <td><code>${sm.certificate_reference || '--'}</code></td>
+                            </tr>
+                        `).join("");
+                    }
+
+                    // Activities Tab
+                    document.getElementById("countActivities").textContent = data.activities.length;
+                    const actBody = document.getElementById("activitiesTableBody");
+                    if (data.activities.length === 0) {
+                        actBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No activities recorded</td></tr>';
+                    } else {
+                        actBody.innerHTML = data.activities.map(a => `
+                            <tr>
+                                <td class="fw-semibold">${a.activity_name}</td>
+                                <td><span class="badge bg-warning text-dark">${a.category || 'Technical'}</span></td>
+                                <td>${a.activity_date || '--'}</td>
+                                <td>${a.description || '--'}</td>
+                            </tr>
+                        `).join("");
+                    }
+
+                    // Gap Years Tab
+                    document.getElementById("countDrop").textContent = data.drop_years.length;
+                    const dropBody = document.getElementById("dropTableBody");
+                    if (data.drop_years.length === 0) {
+                        dropBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">No gap or drop years recorded</td></tr>';
+                    } else {
+                        dropBody.innerHTML = data.drop_years.map(d => `
+                            <tr>
+                                <td class="fw-semibold">${d.start_year}</td>
+                                <td class="fw-semibold">${d.end_year}</td>
+                                <td>${d.reason || '--'}</td>
+                            </tr>
+                        `).join("");
+                    }
+
+                    // Semesters Table & Progression Chart
+                    const semTableBody = document.getElementById("semestersTableBody");
+                    if (data.semesters.length === 0) {
+                        semTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No semesters recorded</td></tr>';
+                    } else {
+                        semTableBody.innerHTML = data.semesters.map(s => `
+                            <tr>
+                                <td>Semester ${s.semester_number}</td>
+                                <td class="fw-bold text-primary">${s.sgpa ? Number(s.sgpa).toFixed(2) : '--'}</td>
+                                <td class="fw-bold text-success">${s.cgpa ? Number(s.cgpa).toFixed(2) : '--'}</td>
+                            </tr>
+                        `).join("");
+                    }
+
+                    renderProgressionChart(data.semesters);
+                });
+        }
+
+        function renderProgressionChart(semesters) {
+            const ctx = document.getElementById('progressionChart');
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            const sorted = [...semesters].sort((a,b) => a.semester_number - b.semester_number);
+            const labels = sorted.map(s => `Sem ${s.semester_number}`);
+            const sgpaData = sorted.map(s => s.sgpa);
+            const cgpaData = sorted.map(s => s.cgpa);
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'SGPA',
+                            data: sgpaData,
+                            borderColor: '#2563EB',
+                            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            fill: true,
+                            pointRadius: 5
+                        },
+                        {
+                            label: 'CGPA',
+                            data: cgpaData,
+                            borderColor: '#059669',
+                            backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.2,
+                            fill: false,
+                            pointRadius: 5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 10,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function seedDemo() {
+            if (!confirm("Add fictional demo records to demonstrate the multi-student ledger?")) return;
+            fetch("/api/seed_demo", { method: "POST" })
+                .then(r => r.json())
+                .then(res => {
+                    alert(res.message);
+                    loadStudents();
+                });
+        }
+
+        function loadSheetsConfig() {
+            fetch("/api/sheets/config")
+                .then(r => r.json())
+                .then(cfg => {
+                    document.getElementById("sheetsSid").value = cfg.spreadsheet_id || "Not configured";
+                    document.getElementById("sheetsEmail").value = cfg.service_account_email || "Not detected";
+                    const link = document.getElementById("btnOpenSheet");
+                    if (cfg.spreadsheet_id) {
+                        link.href = `https://docs.google.com/spreadsheets/d/${cfg.spreadsheet_id}/edit`;
+                        link.classList.remove("disabled");
+                    } else {
+                        link.classList.add("disabled");
+                    }
+                });
+        }
+
+        function testSheetsConnection() {
+            const logBox = document.getElementById("sheetsLog");
+            const logContainer = document.getElementById("sheetsLogContainer");
+            logContainer.classList.remove("d-none");
+            logBox.textContent = "Testing Google Sheets API connection...";
+
+            fetch("/api/sheets/test", { method: "POST" })
+                .then(r => r.json())
+                .then(res => {
+                    logBox.textContent = res.message;
+                })
+                .catch(err => {
+                    logBox.textContent = "Error: " + err;
+                });
+        }
+
+        function pushSheetsSync() {
+            const logBox = document.getElementById("sheetsLog");
+            const logContainer = document.getElementById("sheetsLogContainer");
+            logContainer.classList.remove("d-none");
+            logBox.textContent = "Preparing payload & executing one-way synchronization to Google Sheets...";
+
+            fetch("/api/sheets/sync", { method: "POST" })
+                .then(r => r.json())
+                .then(res => {
+                    logBox.textContent = res.message;
+                })
+                .catch(err => {
+                    logBox.textContent = "Error: " + err;
+                });
+        }
+
+        function copyServiceAccountEmail() {
+            const emailInput = document.getElementById("sheetsEmail");
+            navigator.clipboard.writeText(emailInput.value);
+            alert("Service account email copied to clipboard!");
+        }
+    </script>
+</body>
+</html>
