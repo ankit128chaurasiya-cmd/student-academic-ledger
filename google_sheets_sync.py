@@ -17,8 +17,13 @@ class GoogleSheetsSyncService:
     Manages one-way sync from Student Academic & Activity Ledger to Google Sheets.
     Safe-by-default: Never attempts external network calls unless explicitly configured.
     """
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RENDER_SECRET = "/etc/secrets/google_sheets_config.json"
 
-    CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "google_sheets_config.json")
+CONFIG_FILE = os.environ.get("GOOGLE_SHEETS_CONFIG_PATH") or (
+    RENDER_SECRET if os.path.exists(RENDER_SECRET)
+    else os.path.join(BASE_DIR, "google_sheets_config.json")
+)
 
     def __init__(self, config_path: str = CONFIG_FILE):
         self.config_path = config_path
